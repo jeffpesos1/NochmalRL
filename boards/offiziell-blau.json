@@ -1,0 +1,124 @@
+{
+  "name": "Offizielles Blatt Blau",
+  "description": "Offizielles Noch mal!-Spielblatt mit blauem Hintergrund, aus Foto digitalisiert (21 Felder je Farbe, 1 Stern je Spalte).",
+  "width": 15,
+  "height": 7,
+  "columns": [
+    "A",
+    "B",
+    "C",
+    "D",
+    "E",
+    "F",
+    "G",
+    "H",
+    "I",
+    "J",
+    "K",
+    "L",
+    "M",
+    "N",
+    "O"
+  ],
+  "start_column": 7,
+  "colors": {
+    "g": {
+      "name": "grün",
+      "hex": "#8cc63f"
+    },
+    "y": {
+      "name": "gelb",
+      "hex": "#f7d23e"
+    },
+    "b": {
+      "name": "blau",
+      "hex": "#5bc0eb"
+    },
+    "r": {
+      "name": "rot",
+      "hex": "#e8378b"
+    },
+    "o": {
+      "name": "orange",
+      "hex": "#f28c28"
+    }
+  },
+  "rows": [
+    "rrggyyyggrrrroo",
+    "orrbbgyggrgyroo",
+    "boobgggrogggggy",
+    "bbooogrroooobby",
+    "gbbrrrbbbbobyyg",
+    "ggyyrbbyyybboyb",
+    "yyyyroooryyborr"
+  ],
+  "stars": [
+    "......*........",
+    "*..*.*...*.*...",
+    ".*...........*.",
+    "............*..",
+    ".......*..*...*",
+    "..*............",
+    "....*...*......"
+  ],
+  "column_points_first": [
+    5,
+    3,
+    3,
+    3,
+    2,
+    2,
+    2,
+    1,
+    2,
+    2,
+    2,
+    3,
+    3,
+    3,
+    5
+  ],
+  "column_points_second": [
+    3,
+    2,
+    2,
+    2,
+    1,
+    1,
+    1,
+    0,
+    1,
+    1,
+    1,
+    2,
+    2,
+    2,
+    3
+  ],
+  "color_points_first": 5,
+  "color_points_second": 3,
+  "jokers": 8,
+  "joker_bonus": 1,
+  "star_penalty": 2,
+  "color_die": [
+    "g",
+    "y",
+    "b",
+    "r",
+    "o",
+    "joker"
+  ],
+  "number_die": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    "joker"
+  ],
+  "end_colors": 2,
+  "official": true,
+  "sheet_color": "blau",
+  "sheet_hex": "#5bc0eb",
+  "order": 6
+}

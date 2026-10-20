@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Noch mal! RL</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="logo">N!</span><span>Noch mal! <em>RL</em></span></div>
+  <nav class="tabs">
+    <button class="tab active" data-view="game">Spiel</button>
+    <button class="tab" data-view="training">Training</button>
+    <button class="tab" data-view="arena">Arena</button>
+    <button class="tab" data-view="eval">Eval</button>
+  </nav>
+  <div class="device" id="device-badge">…</div>
+</header>
+
+<!-- ============================================================ GAME VIEW -->
+<main id="view-game" class="view">
+  <aside class="sidebar">
+    <section class="card" id="setup-card">
+      <h2>Neues Spiel</h2>
+      <label>Spielblatt
+        <select id="board-select"></select>
+      </label>
+      <div class="players" id="player-list"></div>
+      <div class="row">
+        <button class="btn ghost small" id="add-player">+ Spieler</button>
+        <button class="btn ghost small" id="remove-player">− Spieler</button>
+      </div>
+      <label>Würfel
+        <select id="dice-mode">
+          <option value="auto">automatisch würfeln</option>
+          <option value="manual">manuell eingeben (echtes Spiel)</option>
+        </select>
+      </label>
+      <label class="check"><input type="checkbox" id="auto-agents" checked> Agenten ziehen automatisch</label>
+      <label class="check"><input type="checkbox" id="auto-confirm"> Zug automatisch bestätigen, sobald die Auswahl gültig ist</label>
+      <label>Gegnerblätter
+        <select id="opt-opp-view">
+          <option value="full">mitführen – Agenten sehen die Blätter der anderen</option>
+          <option value="none">nicht mitführen – Agenten spielen blind</option>
+        </select>
+      </label>
+      <details class="rules">
+        <summary>Regelvarianten</summary>
+        <label class="check"><input type="checkbox" id="opt-start-always"> Spalte H darf jederzeit eine neue Gruppe beginnen (Wortlaut Anleitung). Aus = nur der allererste Zug, danach nur angrenzend an eigene Kreuze.</label>
+        <label>Freie Anfangswürfe (alle wählen aus allen Würfeln; Anleitung: 3, streng: 0)
+          <input id="opt-free-rounds" type="number" min="0" max="10" value="0"></label>
+      </details>
+      <button class="btn primary" id="start-game">Spiel starten</button>
+      <p class="hint">Sitztyp <b>Extern</b> = realer Mitspieler, dessen Blatt nicht eingegeben wird: pro Runde nur Würfelwahl und Ansagen eintragen. Solo = 1 Spieler (2+2 Würfel, 30 Würfe). Bei mehreren Spielern nimmt der aktive Spieler seine beiden Würfel weg, die anderen wählen aus den restlichen.</p>
+    </section>
+
+    <section class="card" id="turn-card" hidden>
+      <div class="turn-head">
+        <div><div class="muted">Runde</div><div class="big" id="round-label">1</div></div>
+        <div><div class="muted">Am Zug</div><div class="big" id="turn-label">–</div></div>
+      </div>
+      <div id="dice-area" class="dice-area"></div>
+      <div class="actions" id="actions"></div>
+      <div id="selection-info" class="sel-info"></div>
+      <div id="extern-panel" class="extern-panel" hidden></div>
+    </section>
+
+    <section class="card" id="suggest-card" hidden>
+      <h2>Agent-Vorschläge <span class="muted" id="suggest-agent"></span></h2>
+      <div id="suggestions"></div>
+    </section>
+
+    <section class="card" id="history-card" hidden>
+      <h2>Verlauf</h2>
+      <div id="history" class="history"></div>
+    </section>
+  </aside>
+
+  <section class="content" id="boards"></section>
+  <div id="mobile-bar" class="mobile-bar" hidden></div>
+</main>
+
+<!-- ========================================================= TRAINING VIEW -->
+<main id="view-training" class="view" hidden>
+  <div class="train-head">
+    <div class="run-select">
+      <label>Run <select id="run-select"></select></label>
+      <span class="status-pill" id="train-status">–</span>
+    </div>
+    <div class="row">
+      <button class="btn ghost small" id="toggle-train-form">Neues Training</button>
+      <button class="btn ghost small" id="toggle-ft-form">Finetuning</button>
+      <button class="btn danger small" id="stop-training" hidden>Stop</button>
+      <button class="btn ghost small" id="delete-run" title="Lauf samt Checkpoints löschen">🗑 Lauf löschen</button>
+    </div>
+  </div>
+
+  <section class="card" id="ft-form" hidden>
+    <h2>Finetuning (Best Practices: KL/L2 zur Referenz, Warmup, Köpfe zuerst, Gegner-Pool, Auswahl nach Eval)</h2>
+    <div class="form-grid">
+      <label>Basis-Checkpoint(s) <select id="ft-base" multiple size="5"></select></label>
+      <label>Iterationen <input id="ft-iters" type="number" value="60"></label>
+      <label>Spieler <input id="ft-players" type="number" min="1" max="6" value="2"></label>
+      <label>Lernrate <input id="ft-lr" type="number" step="0.00001" value="0.0001"></label>
+      <label>KL zur Referenz (PPO/A2C/VPG) <input id="ft-kl" type="number" step="0.005" value="0.02"></label>
+      <label>L2 zur Referenz (DQN) <input id="ft-l2" type="number" step="0.0005" value="0.001"></label>
+      <label>Warmup-Iterationen <input id="ft-warmup" type="number" value="10"></label>
+      <label>Nur Köpfe (Iterationen) <input id="ft-freeze" type="number" value="5"></label>
+      <label>Spielblatt <select id="ft-board"></select></label>
+      <label>Gegner-Spielfeld <select id="ft-opp-view"><option value="full">sichtbar</option><option value="none">verborgen (blind)</option></select></label>
+      <label class="check"><input type="checkbox" id="ft-pool" checked> Gegner-Pool aus allen gewählten Basis-Checkpoints</label>
+      <label>Namenszusatz <input id="ft-suffix" value="-ft"></label>
+    </div>
+    <div class="row" style="flex-wrap:wrap">
+      <button class="btn primary small" id="ft-start">Gewählte parallel finetunen</button>
+      <button class="btn small" id="ft-pipeline">Pipeline: alle Modelle finetunen → Turnier → Champion</button>
+      <span class="muted" id="ft-parallel-info"></span>
+    </div>
+    <div id="pipeline-status" class="hint" style="margin-top:8px"></div>
+  </section>
+
+  <section class="card" id="run-header" hidden>
+    <div class="run-head-grid">
+      <div>
+        <div class="muted">Lauf</div>
+        <div class="big" id="rh-name">–</div>
+        <div class="chips" id="rh-chips"></div>
+      </div>
+      <div class="progress-wrap">
+        <div class="row" style="justify-content:space-between"><span class="muted">Fortschritt</span><span class="muted" id="rh-eta"></span></div>
+        <div class="progress"><div class="bar" id="rh-bar"></div></div>
+        <div class="muted" id="rh-progress-text"></div>
+        <div class="muted" style="margin-top:10px">Ablauf einer Iteration</div>
+        <div class="phase-bar" id="rh-phases"></div>
+        <div class="legend" id="rh-phase-legend"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="train-form" hidden>
+    <h2>Training starten</h2>
+    <div class="form-grid">
+      <label>Name <input id="tf-run" value="duo"></label>
+      <label>Spielblatt <select id="tf-board"></select></label>
+      <label>Spieler <input id="tf-players" type="number" min="1" max="6" value="2"></label>
+      <label>Parallele Spiele <input id="tf-games" type="number" value="2048"></label>
+      <label>Runden/Iteration <input id="tf-rounds" type="number" value="32"></label>
+      <label>Iterationen <input id="tf-iters" type="number" value="1000"></label>
+      <label>Lernrate <input id="tf-lr" type="number" step="0.0001" value="0.0003"></label>
+      <label>Entropie-Bonus <input id="tf-ent" type="number" step="0.001" value="0.01"></label>
+      <label>Margin-Gewicht <input id="tf-margin" type="number" step="0.05" value="0"></label>
+      <label>Eval alle n Iter. <input id="tf-eval" type="number" value="20"></label>
+      <label>Kanäle <input id="tf-channels" type="number" value="64"></label>
+      <label>Res-Blöcke <input id="tf-blocks" type="number" value="4"></label>
+      <label>Minibatch (PPO; große Netze: 2048) <input id="tf-minibatch" type="number" value="8192"></label>
+      <label>Fortsetzen von <input id="tf-resume" placeholder="z.B. duo/latest.pt"></label>
+      <label>Extra-Argumente <input id="tf-extra" placeholder="--no-compile"></label>
+      <label>Freie Anfangswürfe <input id="tf-free-rounds" type="number" min="0" value="0"></label>
+      <label class="check"><input type="checkbox" id="tf-start-always"> Spalte H jederzeit als Start</label>
+      <label>Algorithmus <select id="tf-algo"><option value="ppo">PPO</option><option value="a2c">A2C</option><option value="vpg">VPG (REINFORCE)</option><option value="dqn">Double DQN</option></select></label>
+      <label>Blätter <select id="tf-board-mode"><option value="single">nur das gewählte Spielblatt</option><option value="official">alle offiziellen Blätter rotierend (jedes Spiel ein eigenes)</option></select></label>
+      <label>Weitere Trainingsblätter (IDs, Komma) <input id="tf-boards" placeholder="optional"></label>
+      <label>Generierte Zufallsblätter im Pool <input id="tf-random-boards" type="number" min="0" value="0"></label>
+      <label>Seed der Zufallsblätter <input id="tf-board-seed" type="number" value="0"></label>
+      <label>Referenzgegner (Eval) <select id="tf-eval-opp"></select></label>
+      <label>Gegner-Spielfeld <select id="tf-opp-view"><option value="full">sichtbar (Agent sieht die Blätter der anderen)</option><option value="none">verborgen (blind)</option></select></label>
+    </div>
+    <button class="btn primary" id="start-training">Training starten</button>
+  </section>
+
+  <section class="kpis" id="kpis"></section>
+
+  <section class="card chart-card">
+    <div class="chart-head">
+      <div>
+        <div class="muted">Durchschnittlicher Spiel-Score</div>
+        <div class="big" id="score-headline">–</div>
+        <div class="delta" id="score-delta"></div>
+      </div>
+      <div class="range-tabs" id="range-tabs">
+        <button data-range="100">100</button>
+        <button data-range="500">500</button>
+        <button data-range="0" class="active">Alle</button>
+      </div>
+    </div>
+    <div id="chart-score" class="chart main-chart"></div>
+    <div class="legend" id="legend-score"></div>
+  </section>
+
+  <section class="chart-grid" id="small-charts"></section>
+
+  <section class="card">
+    <div class="chart-head">
+      <div><div class="muted">Läufe vergleichen (Eval-Score, greedy)</div></div>
+      <div id="compare-runs" class="claim-list"></div>
+    </div>
+    <div id="chart-compare" class="chart" style="height:260px"></div>
+    <div class="legend" id="legend-compare"></div>
+  </section>
+
+  <section class="card">
+    <h2>Konsole</h2>
+    <pre id="train-console" class="console">–</pre>
+  </section>
+</main>
+
+<!-- ============================================================ ARENA VIEW -->
+<main id="view-arena" class="view" hidden>
+  <section class="card">
+    <h2>Turnier: Agenten gegeneinander</h2>
+    <div class="arena-form">
+      <div>
+        <div class="muted" style="margin-bottom:6px">Agenten</div>
+        <div id="arena-agents" class="claim-list"></div>
+      </div>
+      <div>
+        <div class="muted" style="margin-bottom:6px">Spieleranzahl</div>
+        <div id="arena-players" class="claim-list">
+          <label><input type="checkbox" value="1"> Solo</label>
+          <label><input type="checkbox" value="2" checked> 2</label>
+          <label><input type="checkbox" value="3" checked> 3</label>
+          <label><input type="checkbox" value="4"> 4</label>
+        </div>
+      </div>
+      <label>Spiele je Paarung <input id="arena-games" type="number" value="200" min="8"></label>
+      <div>
+        <div class="muted" style="margin-bottom:6px">Ensemble aus den markierten Agenten</div>
+        <div class="row">
+          <select id="ens-mode" style="width:auto"><option value="mean">Mittelung (Soft-Voting)</option><option value="vote">Mehrheit (Hard-Voting)</option></select>
+          <button class="btn ghost small" id="ens-add">Ensemble anlegen</button>
+        </div>
+      </div>
+      <div class="row">
+        <button class="btn primary small" id="arena-start">Turnier starten</button>
+        <span class="status-pill" id="arena-status">–</span>
+      </div>
+    </div>
+    <pre id="arena-console" class="console" style="margin-top:10px;max-height:120px">–</pre>
+  </section>
+  <div class="run-select">
+    <label>Ergebnis <select id="arena-select"></select></label>
+  </div>
+  <section id="arena-results"></section>
+</main>
+
+<!-- ============================================================= EVAL VIEW -->
+<main id="view-eval" class="view" hidden>
+  <section class="card">
+    <h2>Unabhängige Evaluation (jederzeit erneut, auf wählbaren Datensätzen)</h2>
+    <div class="arena-form eval-form">
+      <div>
+        <div class="muted" style="margin-bottom:6px">Agenten</div>
+        <div id="eval-agents" class="claim-list"></div>
+      </div>
+      <div>
+        <div class="muted" style="margin-bottom:6px">Datensätze (Spielblätter)</div>
+        <div id="eval-boards" class="claim-list"></div>
+        <div class="row" style="margin-top:6px">
+          <label style="margin:0">Zufallsblätter <input id="eval-random-n" type="number" min="0" value="16" style="width:80px"></label>
+          <label style="margin:0">Seed <input id="eval-random-seed" type="number" value="1" style="width:80px"></label>
+        </div>
+      </div>
+      <div>
+        <label>Spieler <input id="eval-players" type="number" min="1" max="6" value="2"></label>
+        <label>Spiele je Agent/Datensatz <input id="eval-games" type="number" value="512" min="32"></label>
+        <label>Würfel-Seed <input id="eval-seed" type="number" value="123"></label>
+      </div>
+      <div>
+        <label>Referenzgegner <select id="eval-opponent"></select></label>
+        <label class="check"><input type="checkbox" id="eval-start-always"> Spalte H jederzeit</label>
+        <label>Freie Anfangswürfe <input id="eval-free-rounds" type="number" min="0" value="0"></label>
+        <label>Bezeichnung <input id="eval-label" placeholder="z.B. zufallsblaetter"></label>
+      </div>
+      <div class="row">
+        <button class="btn primary small" id="eval-start">Evaluation starten</button>
+        <span class="status-pill" id="eval-status">–</span>
+      </div>
+    </div>
+    <pre id="eval-console" class="console" style="margin-top:10px;max-height:120px">–</pre>
+  </section>
+  <div class="run-select">
+    <label>Ergebnis <select id="eval-select"></select></label>
+    <button class="btn ghost small" id="eval-delete">🗑 löschen</button>
+  </div>
+  <section id="eval-results"></section>
+</main>
+
+<div id="toast" class="toast" hidden></div>
+<script src="/static/charts.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

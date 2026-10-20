@@ -1,0 +1,48 @@
+x-gpu: &gpu
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: all
+            capabilities: [gpu]
+
+services:
+  # Web UI + API (inference on the GPU, can also launch training from the dashboard)
+  web:
+    build: .
+    image: nochmal-rl
+    <<: *gpu
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./checkpoints:/app/checkpoints
+      - ./boards:/app/boards
+    environment:
+      - NOCHMAL_DEVICE=cuda
+    restart: unless-stopped
+
+  # Stand-alone training job:  docker compose run --rm train [extra args]
+  train:
+    build: .
+    image: nochmal-rl
+    <<: *gpu
+    profiles: ["train"]
+    volumes:
+      - ./checkpoints:/app/checkpoints
+      - ./boards:/app/boards
+    entrypoint: ["python", "-m", "nochmal.train"]
+    command: ["--board", "classic", "--players", "2", "--games", "2048", "--iters", "2000", "--out", "/app/checkpoints/duo"]
+
+  # CPU-only fallback for machines without the NVIDIA toolkit:  docker compose --profile cpu up web-cpu
+  web-cpu:
+    build: .
+    image: nochmal-rl
+    profiles: ["cpu"]
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./checkpoints:/app/checkpoints
+      - ./boards:/app/boards
+    environment:
+      - NOCHMAL_DEVICE=cpu
